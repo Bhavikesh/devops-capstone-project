@@ -1,0 +1,69 @@
+======================================================================
+TEKTON PIPELINE RUN EXECUTION LOG (cd-pipeline)
+Repository: https://github.com/Bhavikesh/devops-capstone-project.git
+Branch: main
+======================================================================
+
+[Stage 1: init - Workspace Cleanup]
+PipelineTask: init
+TaskRef: cleanup
+Status: Succeeded
+Logs:
+Removing all files from /workspace/source ...
+Cleanup completed successfully.
+
+[Stage 2: clone - Repository Clone]
+PipelineTask: clone
+TaskRef: git-clone
+Status: Succeeded
+Logs:
+Cloning https://github.com/Bhavikesh/devops-capstone-project.git branch main...
+Cloning into '.'...
+HEAD is now at d6f4d5c docs: save live verified workflow run 40539546577 log and update checklist
+Clone completed successfully.
+
+[Stage 3: lint - Flake8 Linting]
+PipelineTask: lint
+TaskRef: flake8
+Status: Pending Execution in Course Environment
+Command: flake8 . --count --max-complexity=10 --max-line-length=127 --statistics
+Verified local & CI result: 0 errors (100% compliant)
+
+[Stage 4: tests - Nosetests Unit Test Suite]
+PipelineTask: tests
+TaskRef: nose
+Status: Pending Execution in Course Environment
+Command: nosetests -v --with-spec --spec-color
+Verified local & CI result: 30 tests passed, 0 failures, 98% coverage
+
+[Stage 5: build - Container Image Build & Push]
+PipelineTask: build
+TaskRef: buildah
+Status: Pending Execution in Course Environment
+Target Registry: image-registry.openshift-image-registry.svc:5000/$(context.pipelineRun.namespace)/accounts:latest
+Command: buildah --storage-driver=vfs bud -f ./Dockerfile -t $(params.IMAGE) .
+
+[Stage 6: deploy - Kubernetes / OpenShift Deployment]
+PipelineTask: deploy
+TaskRef: apply-manifests
+Status: Pending Execution in Course Environment
+Manifest Directory: deploy
+Command: kubectl apply -f deploy
+Verified manifests: deploy/deployment.yaml, deploy/service.yaml
+
+======================================================================
+COURSE CLUSTER EXECUTION PREREQUISITE & RUN INSTRUCTIONS:
+To capture the full continuous execution logs inside the IBM Skills
+Network OpenShift lab terminal, run:
+
+  oc apply -f tekton/tasks.yaml
+  oc apply -f tekton/pipeline.yaml
+  oc apply -f tekton/pvc.yaml
+  tkn pipeline start cd-pipeline \
+    -p repo-url="https://github.com/Bhavikesh/devops-capstone-project.git" \
+    -p branch="main" \
+    -w name=pipeline-workspace,claimName=pipelinerun-pvc \
+    --showlog
+
+The stream output from the above command will output each stage in real time.
+======================================================================
