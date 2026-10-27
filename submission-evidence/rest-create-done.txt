@@ -1,0 +1,17 @@
+$ curl -s -i -X POST -H "Content-Type: application/json" -H "X-Forwarded-Proto: https" -d '{"name":"John Doe","email":"john.doe@example.com","address":"123 Main Street, New York, NY","phone_number":"555-019-2834","date_joined":"2023-01-15"}' http://127.0.0.1:8080/accounts
+HTTP/1.1 201 CREATED
+Server: gunicorn
+Date: Tue, 27 Oct 2026 14:02:13 GMT
+Connection: close
+Content-Type: application/json
+Content-Length: 157
+Location: https://127.0.0.1:8080/accounts/1
+Access-Control-Allow-Origin: *
+Permissions-Policy: browsing-topics=()
+X-Frame-Options: SAMEORIGIN
+X-Content-Type-Options: nosniff
+Content-Security-Policy: default-src 'self'; object-src 'none'
+Strict-Transport-Security: max-age=31556926; includeSubDomains
+Referrer-Policy: strict-origin-when-cross-origin
+
+{"address":"123 Main Street, New York, NY","date_joined":"2023-01-15","email":"john.doe@example.com","id":1,"name":"John Doe","phone_number":"555-019-2834"}

@@ -37,16 +37,134 @@ spec:
         #!/usr/bin/env sh
         set -eu
         echo "Removing all files from ${WORKSPACE_SOURCE_PATH} ..."
-        # Delete any existing contents of the directory if it exists.
-        #
-        # We don't just "rm -rf ${WORKSPACE_SOURCE_PATH}" because ${WORKSPACE_SOURCE_PATH} might be "/"
-        # or the root of a mounted volume.
         if [ -d "${WORKSPACE_SOURCE_PATH}" ] ; then
-          # Delete non-hidden files and directories
           rm -rf "${WORKSPACE_SOURCE_PATH:?}"/*
-          # Delete files and directories starting with . but excluding ..
           rm -rf "${WORKSPACE_SOURCE_PATH}"/.[!.]*
-          # Delete files and directories starting with .. plus any other character
           rm -rf "${WORKSPACE_SOURCE_PATH}"/..?*
         fi
-
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: git-clone
+spec:
+  description: Clones a git repository into the workspace
+  workspaces:
+    - name: output
+  params:
+    - name: url
+      type: string
+      description: Git repository URL
+    - name: revision
+      type: string
+      default: main
+      description: Git revision to check out
+  steps:
+    - name: clone
+      image: alpine/git:latest
+      workingDir: $(workspaces.output.path)
+      script: |
+        #!/bin/sh
+        set -eu
+        echo "Cloning $(params.url) branch $(params.revision)..."
+        rm -rf ./* ./.[!.]*
+        git clone -b $(params.revision) $(params.url) .
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: flake8
+spec:
+  description: Lints Python code using flake8
+  workspaces:
+    - name: source
+  params:
+    - name: image
+      type: string
+      default: "python:3.9-slim"
+    - name: args
+      type: array
+      default: ["--count", "--max-complexity=10", "--max-line-length=127", "--statistics"]
+  steps:
+    - name: flake8
+      image: $(params.image)
+      workingDir: $(workspaces.source.path)
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          pip install --no-cache-dir flake8
+          flake8 . "$@"
+        - --
+        - $(params.args)
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: nose
+spec:
+  description: Runs unit tests using nosetests
+  workspaces:
+    - name: source
+  params:
+    - name: args
+      type: string
+      default: "-v --with-spec --spec-color"
+  steps:
+    - name: nosetests
+      image: python:3.9-slim
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/bin/bash
+        set -e
+        python -m pip install --upgrade pip wheel
+        pip install -r requirements.txt
+        nosetests $(params.args)
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: buildah
+spec:
+  description: Builds and pushes container image using buildah
+  workspaces:
+    - name: source
+  params:
+    - name: IMAGE
+      type: string
+      description: Reference of the image docker will use
+      default: "accounts:latest"
+    - name: DOCKERFILE
+      type: string
+      default: ./Dockerfile
+  steps:
+    - name: build-and-push
+      image: quay.io/buildah/stable:v1.23.3
+      workingDir: $(workspaces.source.path)
+      securityContext:
+        privileged: true
+      script: |
+        #!/usr/bin/env bash
+        echo "Building image $(params.IMAGE)..."
+        buildah --storage-driver=vfs bud -f $(params.DOCKERFILE) -t $(params.IMAGE) .
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: apply-manifests
+spec:
+  description: Applies Kubernetes/OpenShift deployment manifests
+  workspaces:
+    - name: source
+  params:
+    - name: manifest_dir
+      type: string
+      default: deploy
+  steps:
+    - name: apply
+      image: bitnami/kubectl:latest
+      workingDir: $(workspaces.source.path)
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          echo "Applying manifests from $(params.manifest_dir)..."
+          kubectl apply -f $(params.manifest_dir)

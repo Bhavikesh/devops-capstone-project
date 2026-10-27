@@ -64,6 +64,7 @@ class TestAccount(unittest.TestCase):
         self.assertEqual(account.address, fake_account.address)
         self.assertEqual(account.phone_number, fake_account.phone_number)
         self.assertEqual(account.date_joined, fake_account.date_joined)
+        self.assertEqual(repr(account), f"<Account {fake_account.name} id=[None]>")
 
     def test_add_a_account(self):
         """It should Create an account and add it to the database"""
@@ -175,3 +176,22 @@ class TestAccount(unittest.TestCase):
         """It should not Deserialize an account with a TypeError"""
         account = Account()
         self.assertRaises(DataValidationError, account.deserialize, [])
+
+    def test_persistent_base(self):
+        """It should test PersistentBase constructor"""
+        from service.models import PersistentBase
+        base = PersistentBase()
+        self.assertIsNone(base.id)
+
+    def test_deserialize_without_date_joined(self):
+        """It should Deserialize an account without date_joined"""
+        data = {
+            "name": "Jane Doe",
+            "email": "jane@example.com",
+            "address": "456 Main St",
+            "phone_number": "555-1234"
+        }
+        account = Account()
+        account.deserialize(data)
+        self.assertEqual(account.name, "Jane Doe")
+        self.assertIsNotNone(account.date_joined)
